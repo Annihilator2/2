@@ -12,7 +12,7 @@ using namespace std;
 		size = 1;
 		elemNum = 0;
 		arr = new long long[size];
-		setArr(elemNum);
+		init(elemNum);
 	}
 
 	//Конструктор, создающий массив размера N (если N<=0, то присваивается nullptr)
@@ -21,7 +21,7 @@ using namespace std;
 		elemNum = 0;
 		if (size > 0) {
 			arr = new long long[size];
-			setArr(elemNum);
+			init(elemNum);
 		}
 		else arr = nullptr;
 	}
@@ -40,15 +40,6 @@ using namespace std;
 	//Деструктор
 	Array::~Array() {
 		delete[] arr;
-	}
-
-	/*
-	* Статический метод empty, который возвращает пустой массив
-	* (0 элементов, 0 длина, nullptr)
-	*/
-	Array Array::empty() {
-		Array emptyArr(0);
-		return emptyArr;
 	}
 
 	//Метод получения размера массива
@@ -72,54 +63,20 @@ using namespace std;
 	}
 
 	/*
-	* Метод проверки массива на пустоту:
-	* 1)возвращает 0, если не массив не пуст
-	* 2)возвращает 1, если массив пуст
-	*/
-	short Array::isEmpty() {
-		short state = 1;
-		if (arr != nullptr) state = 0;
-		for (int i = 0; i < elemNum; i++) {
-			if (arr[i] != 0) {
-				state = 0;
-				break;
-			}
-			else state = 1;
-		}
-		return state;
-	}
-
-	/*
-	* Метод расширения массива:
-	* 1)если массив пустой, то его размер увеличивается на 1
-	* 2)если массив не пустой, то размер увеличивается в 2 раза
-	* 3)после расширения заполняем его нулями
-	*/
-	void Array::expand() {
-		long long* newArr = nullptr;
-		if (size > 0) newArr = new long long[size * expCoef];
-		else newArr = new long long[1];
-		memcpy(newArr, arr, size * sizeof(long long));
-		delete[] arr;
-		arr = newArr;
-		if (size != 0) size *= expCoef;
-		else size++;
-		setArr(elemNum);
-	}
-
-	/*
 	* Метод уменьшения размера массива на amount элементов:
 	* 1)в случае если массив полностью заполнен, то также уменьшаем кол-во
 	*   элементов
 	* 2)иначе просто уменьшаем размер массива на amount
 	*/
-	void Array::redArrCap(int amount) {
-		long long* arrCpy = new long long[size - amount];
-		memcpy(arrCpy, arr, (size - amount) * sizeof(long long));
-		delete[] arr;
-		arr = arrCpy;
-		if (size == elemNum) elemNum -= amount;
-		size -= amount;
+	void Array::reduceCap(int amount) {
+		if (amount > 0 && amount < size) {
+			long long* arrCpy = new long long[size - amount];
+			memcpy(arrCpy, arr, (size - amount) * sizeof(long long));
+			delete[] arr;
+			arr = arrCpy;
+			if (size == elemNum) elemNum -= amount;
+			size -= amount;
+		}
 	}
 
 	/*
@@ -129,13 +86,15 @@ using namespace std;
 	void Array::makeEqualSize(int size1, int size2) {
 		int maxSize = size1 < size2 ? size2 : size1;
 		int oldSize = size;
-		long long* arrCpy;
-		arrCpy = new long long[maxSize];
-		memcpy(arrCpy, arr, oldSize * sizeof(long long));
-		delete[] arr;
-		arr = arrCpy;
-		size = maxSize;
-		setArr(oldSize);
+		if (maxSize > oldSize) {
+			long long* arrCpy;
+			arrCpy = new long long[maxSize];
+			memcpy(arrCpy, arr, oldSize * sizeof(long long));
+			delete[] arr;
+			arr = arrCpy;
+			size = maxSize;
+			init(oldSize);
+		}
 	}
 
 	/*
@@ -175,11 +134,17 @@ using namespace std;
 		return cStr;
 	}
 
+	//Мето добавления элемента в конец массива
+	void Array::addToEnd(long long value) {
+		if (elemNum == size)
+			expand();
+		arr[elemNum++] = value;
+	}
+
 	//Метод вставки элемента по индеку в массив
 	void Array::insertByIndex(long long value, int index) {
 		if (index > size || index < 0)
 			throw("Exception: out of bounds");
-		//(index + 1) > elemNum)
 		if ((arr[index] == 0) && (elemNum < size)) arr[index] = value;
 		else if (index == size) addToEnd(value);
 		else {
@@ -192,11 +157,12 @@ using namespace std;
 		elemNum++;
 	}
 
-	//Мето добавления элемента в конец массива
-	void Array::addToEnd(long long value) {
-		if (elemNum == size)
-			expand();
-		arr[elemNum++] = value;
+	//Метод удаления массива по индексу
+	void Array::deleteByIndex(int index) {
+		if (index < 0 || index >= size)
+			throw("Exception: out of bounds");
+		arr[index] = 0;
+		elemNum--;
 	}
 	
 	//Метод получения по индексу массива
@@ -216,12 +182,39 @@ using namespace std;
 		return arrSlice;
 	}
 
+	/*
+	* Метод проверки массива на пустоту:
+	* 1)возвращает 0, если не массив не пуст
+	* 2)возвращает 1, если массив пуст
+	*/
+	bool Array::isEmpty() {
+		bool state = true;
+		if (arr != nullptr) state = 0;
+		for (int i = 0; i < elemNum; i++) {
+			if (arr[i] != 0) {
+				state = false;
+				break;
+			}
+			else state = 1;
+		}
+		return state;
+	}
+
+	//Метод поиска элемента в массива: возвращает 1, если найдено, иначе 0
+	bool Array::isElem(long long value) {
+		bool state = false;
+		long long* end = arr + size;
+		long long* pos = find(arr, end, value);
+		if (pos != end) state=true;
+		return state;
+	}
+
 	//Метод сдвига право всех элементов массива, начиная с эл. по индексу index
 	void Array::shiftSliceR(int index) {
 		if (index < 0 || index >= size)
 			throw("Exception: out of bounds");
 		size_t numOfElm = elemNum - index;
-		while (size - elemNum < numOfElm) expand();
+		if (size <= numOfElm) expand();
 		long long* pos = arr + index;
 		memmove(pos + 1, pos, numOfElm * sizeof(long long));
 		arr[index] = 0;
@@ -234,47 +227,57 @@ using namespace std;
 		long long* pos = arr + index;
 		size_t numOfElm = size - index - 1;
 		memmove(pos, pos + 1, numOfElm * sizeof(long long));
-	}
-
-	//Метод удаления массива по индексу
-	void Array::deleteByIndex(int index) {
-		if (index < 0 || index >= size)
-			throw("Exception: out of bounds");
-		arr[index] = 0;
-		elemNum--;
-	}
-
-	//Метод поиска элемента в массива: возвращает 1, если найдено, иначе 0
-	short Array::searchForElm(long long value) {
-		short state = 0;
-		long long* end = arr + size;
-		long long* pos = find(arr, end, value);
-		if (pos != end) state=1;
-		return state;
+		arr[numOfElm] = 0;
 	}
 
 	//Метод обмена полями двух объектов Array
-	void Array::swapArray(Array& second) {
-		int tmpSize = size;
-		int tmpElemNum = elemNum;
-		long long* tmpArr = arr;
-		size = second.size;
+	void Array::swapArray(Array& first, Array& second) {
+		int tmpSize = first.size;
+		int tmpElemNum = first.elemNum;
+		long long* tmpArr = first.arr;
+		first.size = second.size;
 		second.size = tmpSize;
-		elemNum = second.elemNum;
+		first.elemNum = second.elemNum;
 		second.elemNum = tmpElemNum;
-		arr = second.arr;
+		first.arr = second.arr;
 		second.arr = tmpArr;
 	}
 
+	/*
+	* Статический метод empty, который возвращает пустой массив
+	* (0 элементов, 0 длина, nullptr)
+	*/
+	Array Array::empty() {
+		Array emptyArr(0);
+		return emptyArr;
+	}
+
 	//Метод присваения 0 всем элементам, начиная с элемента под индексом from
-	void Array::setArr(int from) {
+	void Array::init(int from) {
 		for (size_t i = from; i < size; i++) {
 			arr[i] = 0;
 		}
-
 	}
 
-	//Метод подсчета кол-ва разрядов числа value
+	/*
+	* Метод расширения массива:
+	* 1)если массив пустой, то его размер увеличивается на 1
+	* 2)если массив не пустой, то размер увеличивается в 2 раза
+	* 3)после расширения заполняем его нулями
+	*/
+	void Array::expand() {
+		long long* newArr = nullptr;
+		if (size > 0) newArr = new long long[size * expCoef];
+		else newArr = new long long[1];
+		memcpy(newArr, arr, size * sizeof(long long));
+		delete[] arr;
+		arr = newArr;
+		if (size != 0) size *= expCoef;
+		else size++;
+		init(elemNum);
+	}
+
+	//Метод подсчета кол-ва цифр числа value (включая знак)
 	int Array::countDigits(long long value) {
 		int digits = 0;
 		if (value == 0 || value < 0) digits++;
@@ -284,3 +287,4 @@ using namespace std;
 		}
 		return digits;
 	}
+

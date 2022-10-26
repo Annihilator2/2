@@ -1,11 +1,13 @@
 #include "BigInt.h"
+#include "Array.h"
 #include <cstdlib>
 #include <iostream>
+#include <string.h>
 
 	// онструктор по умолчанию
-	BigInt::BigInt() {
-		sign = 1;
+	BigInt::BigInt() : BigInt((long long)0) {
 	}
+
 	/*
 	*  онструктор, создающий BigInt из числа value:
 	* 1)подсчитываетс€ кол-во разр€дов числа value;
@@ -24,7 +26,7 @@
 		}
 		else {
 			long long digits = countDigits(value);
-			long long cells = (digits % 9) == 0 ? digits / 9 : digits / 9 + 1;
+			long long cells = (digits % 9) == 0 ? (digits / 9) : (digits / 9 + 1);
 			array.makeEqualSize(array.getSize(), cells);
 			for (int i = cells - 1; i >= 0; i--) {
 				array.insertByIndex(value % BASE, i);
@@ -33,21 +35,61 @@
 		}
 	}
 
+	// онструктор, создающий BigInt из строки
+	BigInt::BigInt(char* valStr) {
+		long long len, cells;
+		if (valStr[0] == '-') {
+			sign = -1;
+			valStr++;
+		}
+		else sign = 1;
+		for (len = 0; valStr[len] != '\0'; len++) {
+			if (valStr[len] < 48 || valStr[len]>57)
+				throw("Exception: invalid string");
+		}
+		cells = (len % 9) == 0 ? (len / 9) : (len / 9 + 1);
+		array.makeEqualSize(array.getSize(), cells);
+		for (size_t i = 0,j = 0; i < len; i+=9,j++) {
+			char digStr[10] = { 0 };
+			if (i + 8 < len - 1) {
+				memcpy(digStr, valStr + i, 9);
+				array.insertByIndex(_atoi64(digStr), j);
+			}
+			else {
+				memcpy(digStr, valStr+i, len - i);
+				array.insertByIndex(_atoi64(digStr), j);
+			}
+		}
+	}
+
+	// онструктор, принимающий в качестве параметра константную строку
+	BigInt::BigInt(const char* valStr) : BigInt((char*)valStr) {
+	}
+
 	// онструктор копировани€
 	BigInt::BigInt(const BigInt& object) : array(object.array) {
 		sign = object.sign;
 	}
+
+
 	//ƒеструктор
 	BigInt::~BigInt() {
 	}
 
 	//ѕолучение числа, представл€ющегос€ массивом Array
-	Array BigInt::getBigInt() {
+	Array BigInt::getArray() {
 		return array;
 	}
 	//ѕолучение знака числа
 	short BigInt::getSign() {
 		return sign;
+	}
+
+	//ѕрисваивание знака числу
+	void BigInt::setSign(short newSign) {
+		if (newSign < -1 || newSign == 0 || newSign >> 1)
+			throw("Exception: invalid sign");
+		sign = newSign;
 	}
 
 	//—оздание строкового представлени€ класса BigInt в виде обычного числа
@@ -73,20 +115,21 @@
 	//возвращает 0, если равны
 	//возвращает -1, если кол-во чисел первого < кол-ва чисел второго
 	//возвращает -2, если первое < второго
-	short BigInt::compareBigInt(BigInt& second) {
+	short BigInt::compare(void* second) {
 		short state;
-		if (array.getElmNum() > second.array.getElmNum()) 
+		BigInt* secondBI = (BigInt*) second;
+		if (array.getElmNum() > secondBI->array.getElmNum())
 			state = 1;
-		else if (array.getElmNum() == second.array.getElmNum()) {
+		else if (array.getElmNum() == secondBI->array.getElmNum()) {
 			state = 0;
 			int size1 = array.getSize();
-			int size2 = second.array.getSize();
+			int size2 = secondBI->array.getSize();
 			for (int i = 0; i < size1 && (state != 2 && state != -2); i++) {
 				long long curElem = array.getByIndex(i);
-				long long secondElem = i < size2 ? second.array.getByIndex(i) : 0;
-				if (curElem > secondElem) 
+				long long secondElem = i < size2 ? secondBI->array.getByIndex(i) : 0;
+				if (curElem > secondElem)
 					state = 2;
-				else if (curElem < secondElem) 
+				else if (curElem < secondElem)
 					state = -2;
 			}
 		}
@@ -95,18 +138,23 @@
 	}
 
 	//ћетод уравнени€ разр€дов двух BigInt чисел
-	void BigInt::equalizeRanks(BigInt& second) {
-		short state = compareBigInt(second);
+	void BigInt::equalize(void* second) {
+		short state = compare(second);
+		BigInt* secondBI = (BigInt*)second;
+		int elemNum1 = array.getElmNum();
+		int elemNum2 = secondBI->array.getElmNum();
 		if (state == 1) {
-			while (second.array.getElmNum() < array.getElmNum()) {
-				second.array.shiftSliceR(0);
-				second.array.insertByIndex(0, 0);
+			while (elemNum2 < elemNum1) {
+				secondBI->array.shiftSliceR(0);
+				secondBI->array.insertByIndex(0, 0);
+				elemNum2++;
 			}
 		}
 		else if (state == -1) {
-			while (array.getElmNum() < second.array.getElmNum()) {
+			while (elemNum1 < elemNum2) {
 				array.shiftSliceR(0);
 				array.insertByIndex(0, 0);
+				elemNum1++;
 			}
 		}
 	}
@@ -117,31 +165,32 @@
 	* 2)сложение реализуетс€ путем сложени€ в столбик, где каждый разр€д
 	    складываетс€ с аналогичным ему
 	*/
-	void BigInt::sumBigInt(BigInt& current, BigInt added) {
+	void BigInt::add(void* added) {
+		BigInt* secondBi = (BigInt*)added;
 		long long rest = 0, result = 0;
-		if (current.sign == 1 && added.sign == -1) {
-			current.sign *= -1;
-			subBigInt(current,added);
-			current.sign *= -1;
+		if (sign == 1 && secondBi->sign == -1) {
+			sign *= -1;
+			subtract(added);
+			sign *= -1;
 		}
-		else if (current.sign == -1 && added.sign == 1) {
-			current.sign *= -1;
-			subBigInt(current,added);
-			current.sign *= -1;
+		else if (sign == -1 && secondBi->sign == 1) {
+			sign *= -1;
+			subtract(added);
+			sign *= -1;
 		}
 		else  {
-			current.equalizeRanks(added);
-			for (int i = current.array.getSize() - 1, j = i; i >= 0; i--, j--) {
-				long long curElem = current.array.getByIndex(i);
-				long long addedElem = j >= 0 ? added.array.getByIndex(i) : 0;
+			equalize(added);
+			for (int i = array.getSize() - 1, j = i; i >= 0; i--, j--) {
+				long long curElem = array.getByIndex(i);
+				long long addedElem = j >= 0 ? secondBi->array.getByIndex(i) : 0;
 				result = curElem + addedElem + rest;
 				rest = result >= BASE ? 1 : 0;
 				result -= rest > 0 ? BASE : 0;
-				current.array.deleteByIndex(i);
-				current.array.insertByIndex(result, i);
-				if (rest && current.array.getElmNum() == current.array.getSize() && i == 0) {
-					current.array.shiftSliceR(i++);
-					current.array.insertByIndex(0, 0);
+				array.deleteByIndex(i);
+				array.insertByIndex(result, i);
+				if (rest && array.getElmNum() == array.getSize() && i == 0) {
+					array.shiftSliceR(i++);
+					array.insertByIndex(0, 0);
 				}
 			}
 		}
@@ -153,32 +202,33 @@
 	* 2)вычитание реализуетс€ в столбик, где каждый разр€д вычитаетс€ с 
 	    аналогичным ему
 	*/
-	void BigInt::subBigInt(BigInt& current, BigInt subtracted) {
+	void BigInt::subtract(void* subtracted) {
+		BigInt* secondBi = (BigInt*)subtracted;
 		long long rest = 0, result = 0;
-		if (current.sign == -1 && subtracted.sign == 1) {
-			current.sign *= -1;
-			sumBigInt(current,subtracted);
-			current.sign *= -1;
+		if (sign == -1 && secondBi->sign == 1) {
+			sign *= -1;
+			add(subtracted);
+			sign *= -1;
 		}
-		else if (current.sign == 1 && subtracted.sign == -1) {
-			current.sign *= -1;
-			sumBigInt(current,subtracted);
-			current.sign *= -1;
+		else if (sign == 1 && secondBi->sign == -1) {
+			sign *= -1;
+			add(subtracted);
+			sign *= -1;
 		}
 		else {
-			current.equalizeRanks(subtracted);
-			if (current.compareBigInt(subtracted) == -2) {
-				current.swapBigInts(subtracted);
-				current.sign = -1;
+			equalize(subtracted);
+			if (compare(subtracted) == -2) {
+				swap(subtracted);
+				sign = -1;
 			}
-			for (int i = current.array.getElmNum() - 1; i >= 0; i--) {
-				long long curElem = current.array.getByIndex(i);
-				long long subElem = subtracted.array.getByIndex(i);
+			for (int i = array.getElmNum() - 1; i >= 0; i--) {
+				long long curElem = array.getByIndex(i);
+				long long subElem = secondBi->array.getByIndex(i);
 				result = curElem - subElem - rest;
 				rest = result < 0 ? 1 : 0;
 				result += rest > 0 ? BASE : 0;
-				current.array.deleteByIndex(i);
-				current.array.insertByIndex(result, i);
+				array.deleteByIndex(i);
+				array.insertByIndex(result, i);
 			}
 		}
 	}
@@ -193,21 +243,22 @@
 	  3)после умножени€ в начале числа отсекаютс€ ненужные нули, если таковые
 		имеютс€
 	*/
-	void BigInt::multiplyBigInt(BigInt& current, BigInt& factor) {
+	void BigInt::multiply(void* factor) {
+		BigInt* secondBi = (BigInt*)factor;
 		BigInt bigMult;
-		if (factor.array.isEmpty() || current.array.isEmpty()) {
+		if (secondBi->array.isEmpty() || array.isEmpty()) {
 			bigMult.array.addToEnd(0);
-			current.swapBigInts(bigMult);
+			swap(&bigMult);
 		}
 		else {
-			int thisLen = current.array.getSize();
-			int factorLen = factor.array.getSize();
+			int thisLen = array.getSize();
+			int factorLen = secondBi->array.getSize();
 			long long resLen = thisLen + factorLen + 1, resMult = 0, rest = 0;
 			bigMult.array.makeEqualSize(resLen, bigMult.array.getSize());
 			for (int i = thisLen - 1; i >= 0; i--) {
-				long long curElem = current.array.getByIndex(i);
+				long long curElem = array.getByIndex(i);
 				for (int j = factorLen - 1; j >= 0 || rest > 0; j--) {
-					long long factorElem = (j >= 0) ? factor.array.getByIndex(j) : 0;
+					long long factorElem = (j >= 0) ? secondBi->array.getByIndex(j) : 0;
 					long long resElem = bigMult.array.getByIndex(i + j + 2);
 					resMult = resElem + (curElem * factorElem) + rest;
 					if (resElem == 0) 
@@ -221,10 +272,10 @@
 			}
 			while (bigMult.array.getByIndex(0) == 0) {
 				bigMult.array.shiftSliceL(0);
-				bigMult.array.redArrCap(1);
+				bigMult.array.reduceCap(1);
 			}
-			bigMult.sign = (current.sign == factor.sign) ? 1 : -1;
-			current.swapBigInts(bigMult);
+			bigMult.sign = (sign == secondBi->sign) ? 1 : -1;
+			swap(&bigMult);
 		}
 	}
 
@@ -241,27 +292,28 @@
 		3.4)к получившейс€ разности сноситс€ след.разр€д делимого
 	  4)после делени€ происходит отсчечение нулей в начале, если таковые имеютс€
 	*/
-	void BigInt::divBigInt(BigInt& current,BigInt& divr) {
-		BigInt result, curDivr(divr);
+	void BigInt::divide(void* divider) {
+		BigInt* secondBi = (BigInt*)divider;
+		BigInt result, curDivr(*secondBi);
 		curDivr.sign = 1;
 		if (curDivr.array.isEmpty())
 			throw("Exception: division by zero");
-		if (current.compareBigInt(curDivr) < 0) {
+		if (compare(&curDivr) < 0) {
 			result.array.addToEnd(0);
-			current.swapBigInts(result);
+			swap(&result);
 			return;
 		}
-		result.array.makeEqualSize(result.array.getSize(), current.array.getSize());
+		result.array.makeEqualSize(result.array.getSize(), array.getSize());
 		BigInt curDividend(result);
-		for (int i = 0, j = 0; i < current.array.getSize(); i++, j++) {
-			long long curElem = current.array.getByIndex(i);
+		for (int i = 0, j = 0; i < array.getSize(); i++, j++) {
+			long long curElem = array.getByIndex(i);
 			curDividend.array.insertByIndex(curElem, j);
 			long long curFactor = 0, left = 0, right = BASE;
 			while (left <= right) {
 				long long mid = (left + right) / 2;
 				BigInt tmp(mid);
-				multiplyBigInt(tmp,curDivr);
-				if (tmp.compareBigInt(curDividend) <= 0) { 
+				tmp.multiply(&curDivr);
+				if (tmp.compare(&curDividend) <= 0) { 
 					curFactor = mid;
 					left = mid + 1;
 				}
@@ -269,8 +321,8 @@
 			}
 			if (curFactor != 0) result.array.insertByIndex(curFactor, i);
 			BigInt tmpFactor(curFactor);
-			multiplyBigInt(tmpFactor,curDivr);
-			subBigInt(curDividend,tmpFactor);
+			tmpFactor.multiply(&curDivr);
+			curDividend.subtract(&tmpFactor);
 			while (curDividend.array.getByIndex(0) == 0) {
 				if (curDividend.array.getElmNum() == 0) break;
 				curDividend.array.deleteByIndex(0);
@@ -279,24 +331,22 @@
 			}
 		}
 		while (result.array.getByIndex(0) == 0) result.array.shiftSliceL(0);
-		result.array.redArrCap(current.array.getSize() - result.array.getElmNum());
-		result.sign = (current.sign == divr.sign) ? 1 : -1;
-		current.swapBigInts(result);
+		result.array.reduceCap(array.getSize() - result.array.getElmNum());
+		result.sign = (sign == secondBi->sign) ? 1 : -1;
+		swap(&result);
 	}
 
-	/*
-	* ћетод обмена пол€ми дл€ двух BigInt чисел
-	*/
-	void BigInt::swapBigInts(BigInt& a) {
-		this->array.swapArray(a.array);
+	//ћетод обмена пол€ми дл€ двух BigInt чисел
+	void BigInt::swap(void* second) {
+		BigInt* secondBi = (BigInt*)second;
+		Array::swapArray(array, secondBi->array);
 		short tmpSign = sign;
-		sign = a.sign;
-		a.sign = tmpSign;
+		sign = secondBi->sign;
+		secondBi->sign = tmpSign;
 	}
 
-	/*
-	* ћетод подсчета кол-ва разр€дов передаваемого числа value
-	*/
+	
+	//ћетод подсчета кол-ва разр€дов передаваемого числа value
 	int BigInt::countDigits(long long value) {
 		int digits = 0;
 		if (value == 0 || value < 0) digits++;

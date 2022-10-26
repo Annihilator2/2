@@ -1,57 +1,61 @@
 #pragma once
+#include "List.h"
 
-class Array {
+//Класс Array (массив), который является наследником класса List и наследуется классами
+//Stack и Queue 
+class Array : public List {
 public:
+
 	Array();
 
 	Array(int N);
 
 	Array(const Array& object);
 
-	~Array();
+	virtual ~Array();
 
-	static Array empty();
+	int getSize() override;
 
-	int getSize();
-
-	int getElmNum();
+	int getElmNum() override;
 	
-	long long* getArr();
+	long long* getArr() override;
 
-	short isEmpty();
-
-	void expand();
-
-	void redArrCap(int amount);
+	void reduceCap(int amount);
 
 	void makeEqualSize(int size1, int size2);
 
-	char* cStr();
+	char* cStr() override;
 
-	void addToEnd(long long value);
+	void addToEnd(long long value) override;
 	
-	void insertByIndex(long long value, int index);
+	void insertByIndex(long long value, int index) override; 
 	
-	void deleteByIndex(int index);
+	void deleteByIndex(int index) override;
 
-	long long getByIndex(int index);
+	long long getByIndex(int index) override;
 
-	long long* getSlice(int from, int to);
+	long long* getSlice(int from, int to) override;
 
-	void shiftSliceR(int index);
+	void shiftSliceR(int index) override;
 
-	void shiftSliceL(int index);
+	void shiftSliceL(int index) override; 
 
-	short searchForElm(long long value);
+	bool isEmpty() override;
 
-	void swapArray(Array& second);
+	bool isElem(long long value) override;
 
+	static void swapArray(Array& first, Array& second);
+
+	static Array empty();
+private:
 	int size;
 	int elemNum;
 	long long* arr;
 	static const int expCoef = 2;
 
-	void setArr(int from);
+	void init(int from);
+
+	void expand();
 
 	int countDigits(long long value);
 

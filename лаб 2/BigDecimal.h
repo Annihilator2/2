@@ -1,31 +1,30 @@
 #pragma once
-#include "Array.h"
-#include "Number.h"
+#include "BigInt.h"
 
-// ласс BigInt, €вл€ющийс€ наследником класса Number
-class BigInt : public Number {
+// ласс BigDecimal, €вл€ющийс€ наследником класса Number
+class BigDecimal : public Number
+{
 public:
+	BigDecimal();
 
-	BigInt();
+	BigDecimal(char* valStr);
 
-	BigInt(long long value);
+	BigDecimal(const char* valStr);
 
-	BigInt(const BigInt& object);
+	BigDecimal(long double value);
 
-	BigInt(char* valStr);
+	BigDecimal(const BigDecimal& object);
 
-	BigInt(const char* valStr);
-
-	virtual ~BigInt();
+	~BigDecimal();
 
 	Array getArray();
 
 	short getSign();
 
 	void setSign(short newSign);
-
+	
 	char* cStr() override;
-
+	
 	short compare(void* second) override;
 
 	void equalize(void* second) override;
@@ -40,14 +39,15 @@ public:
 
 	void swap(void* second) override;
 
-protected:
-
 private:
-
 	Array array;
-	short sign;
+	short sign; //long long dotPos;
+	int intCells;
+	const static short bufSize = 317;
 	const static int BASE = 1000000000;
 
-	int countDigits(long long value);
+	int getStrLen(char* str);
 
+	int powOfTen(int deg);
 };
+
